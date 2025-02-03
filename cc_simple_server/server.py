@@ -16,6 +16,8 @@ app = FastAPI()
 ############################################
 
 
+
+
 @app.get("/")
 async def read_root():
     """
@@ -24,6 +26,7 @@ async def read_root():
     return {"message": "Welcome to the Cloud Computing!"}
 
 
+##curl -X POST "http://localhost:8000/tasks/" -H "Content-Type: application/json" -d "{\"title\": \"Sample Task\", \"description\": \"Write documentation\", \"completed\": false}"
 # POST ROUTE data is sent in the body of the request
 @app.post("/tasks/", response_model=TaskRead)
 async def create_task(task_data: TaskCreate):
@@ -36,9 +39,27 @@ async def create_task(task_data: TaskCreate):
     Returns:
         TaskRead: The created task data
     """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO tasks (title, description, completed) VALUES (?, ?, ?)",
+        (task_data.title, task_data.description, task_data.completed),
+    )
+    conn.commit()
+
+    task_id = cursor.lastrowid
+
+    cursor.execute("SELECT id, title, description, completed FROM tasks WHERE id = ?", (task_id,))
+    task = cursor.fetchone()
+
+    conn.close()
 
 
+    return TaskRead(id=task['id'], title=task['title'], description=task['description'], completed=task['completed'])
+
+
+
+#curl -X POST "http://localhost:8000/tasks/"
 # GET ROUTE to get all tasks
 @app.get("/tasks/", response_model=list[TaskRead])
 async def get_tasks():
@@ -51,9 +72,22 @@ async def get_tasks():
     Returns:
         list[TaskRead]: A list of all tasks in the database
     """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM tasks")
+    rows = cursor.fetchall()
+
+    conn.close()
 
 
+
+    return [TaskRead(id=task['id'], title=task['title'], description=task['description'], completed=task['completed']) for task in rows]
+
+
+
+#curl -X PUT "http://localhost:8000/tasks/1/" -H "Content-Type: application/json" -d "{\"title\": \"Updated Task\", \"description\": \"Update documentation\", \"completed\": true}"
 # UPDATE ROUTE data is sent in the body of the request and the task_id is in the URL
 @app.put("/tasks/{task_id}/", response_model=TaskRead)
 async def update_task(task_id: int, task_data: TaskCreate):
@@ -67,9 +101,27 @@ async def update_task(task_id: int, task_data: TaskCreate):
     Returns:
         TaskRead: The updated task data
     """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+    "UPDATE tasks SET title = ?, description = ?, completed = ? WHERE id = ?",
+    (task_data.title, task_data.description, task_data.completed, task_id),
+    )
+    conn.commit()
 
 
+    cursor.execute("SELECT id, title, description, completed FROM tasks WHERE id = ?", (task_id,))
+    task = cursor.fetchone()
+
+    conn.close()
+
+
+
+    return TaskRead(id=task['id'], title=task['title'], description=task['description'], completed=task['completed'])
+
+
+#curl -X DELETE "http://localhost:8000/tasks/3/"
 # DELETE ROUTE task_id is in the URL
 @app.delete("/tasks/{task_id}/")
 async def delete_task(task_id: int):
@@ -82,4 +134,22 @@ async def delete_task(task_id: int):
     Returns:
         dict: A message indicating that the task was deleted successfully
     """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+
+
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    task = cursor.fetchone()
+
+    if not task:
+        conn.close()
+        return f"task {task_id} does not exist"
+
+
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+
+    conn.close()
+
+    return f"task {task_id} deleted"
