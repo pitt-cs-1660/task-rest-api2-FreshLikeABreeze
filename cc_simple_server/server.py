@@ -116,8 +116,6 @@ async def update_task(task_id: int, task_data: TaskCreate):
 
     conn.close()
 
-
-
     return TaskRead(id=task['id'], title=task['title'], description=task['description'], completed=task['completed'])
 
 
@@ -137,19 +135,16 @@ async def delete_task(task_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-
-
     cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
     task = cursor.fetchone()
 
     if not task:
         conn.close()
-        return f"task {task_id} does not exist"
-
+        return {"message: f"Task {task_id} does not exist"}
 
     cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
 
     conn.close()
 
-    return f"task {task_id} deleted"
+    return {"message: f"Task {task_id} deleted successfully"}
